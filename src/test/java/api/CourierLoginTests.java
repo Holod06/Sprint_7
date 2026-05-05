@@ -3,10 +3,15 @@ package api;
 import config.ApiConfig;
 import io.qameta.allure.*;
 import io.restassured.response.Response;
+import models.CourierLoginRequest;
+import models.CourierRequest;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
+import static org.apache.http.HttpStatus.*;
 import static org.hamcrest.Matchers.*;
 
 @Epic("REST API Tests")
@@ -15,9 +20,32 @@ import static org.hamcrest.Matchers.*;
 public class CourierLoginTests {
 
     private ApiClient apiClient;
+    private int courierId = -1;
+    private String testLogin;
+    private String testPassword;
 
-    public CourierLoginTests() {
-        this.apiClient = new ApiClient();
+    @BeforeEach
+    public void setUp() {
+        apiClient = new ApiClient();
+        testLogin = "logintest_" + System.currentTimeMillis();
+        testPassword = "password123";
+
+        // Create courier before each test
+        CourierRequest courier = new CourierRequest(testLogin, testPassword, "Test");
+        Response createResponse = apiClient.createCourier(courier);
+        if (createResponse.statusCode() == SC_CREATED) {
+            Response loginResponse = apiClient.loginCourier(new CourierLoginRequest(testLogin, testPassword));
+            if (loginResponse.statusCode() == SC_OK) {
+                courierId = loginResponse.jsonPath().getInt("id");
+            }
+        }
+    }
+
+    @AfterEach
+    public void tearDown() {
+        if (courierId != -1) {
+            apiClient.deleteCourier(courierId);
+        }
     }
 
     @Test
@@ -25,24 +53,12 @@ public class CourierLoginTests {
     @Severity(SeverityLevel.CRITICAL)
     @DisplayName("Courier successfully logs in and receives id")
     public void courierShouldLoginSuccessfully() {
-        String testLogin = "logintest_" + System.currentTimeMillis();
-        String testPassword = "password123";
-
-        // Create courier
-        Response createResponse = apiClient.createCourier(testLogin, testPassword, "Test");
-        createResponse.then().statusCode(201);
-
-        // Login
-        Response loginResponse = apiClient.loginCourier(testLogin, testPassword);
-        int courierId = loginResponse.jsonPath().getInt("id");
+        Response loginResponse = apiClient.loginCourier(new CourierLoginRequest(testLogin, testPassword));
 
         loginResponse.then()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("id", notNullValue())
                 .body("id", isA(Integer.class));
-
-        // Cleanup
-        apiClient.deleteCourier(courierId);
     }
 
     @Test
@@ -52,11 +68,11 @@ public class CourierLoginTests {
     public void shouldReturnErrorWhenLoginIsMissing() {
         Response response = given()
                 .contentType("application/json")
-                .body("{\"password\": \"password123\"}")
+                .body(new CourierLoginRequest(null, "password123"))
                 .post(ApiConfig.BASE_URL + ApiConfig.COURIER_LOGIN_ENDPOINT);
 
         response.then()
-                .statusCode(400)
+                .statusCode(SC_BAD_REQUEST)
                 .body("message", equalTo("Недостаточно данных для входа"));
     }
 
@@ -65,24 +81,11 @@ public class CourierLoginTests {
     @Severity(SeverityLevel.CRITICAL)
     @DisplayName("Error with wrong password")
     public void shouldReturnErrorWithWrongPassword() {
-        String testLogin = "wrongpwd_" + System.currentTimeMillis();
-        String testPassword = "password123";
-
-        // Create courier
-        Response createResponse = apiClient.createCourier(testLogin, testPassword, "Test");
-        createResponse.then().statusCode(201);
-
-        // Try to login with wrong password
-        Response loginResponse = apiClient.loginCourier(testLogin, "wrongpassword");
+        Response loginResponse = apiClient.loginCourier(new CourierLoginRequest(testLogin, "wrongpassword"));
 
         loginResponse.then()
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
-
-        // Get correct ID and cleanup
-        Response correctLoginResponse = apiClient.loginCourier(testLogin, testPassword);
-        int courierId = correctLoginResponse.jsonPath().getInt("id");
-        apiClient.deleteCourier(courierId);
     }
 
     @Test
@@ -92,10 +95,10 @@ public class CourierLoginTests {
     public void shouldReturnErrorForNonExistentCourier() {
         String fakeLogin = "completely_fake_login_" + System.currentTimeMillis();
 
-        Response response = apiClient.loginCourier(fakeLogin, "password");
+        Response response = apiClient.loginCourier(new CourierLoginRequest(fakeLogin, "password"));
 
         response.then()
-                .statusCode(404)
+                .statusCode(SC_NOT_FOUND)
                 .body("message", equalTo("Учетная запись не найдена"));
     }
 }

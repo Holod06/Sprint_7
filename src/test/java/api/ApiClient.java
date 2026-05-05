@@ -12,18 +12,16 @@ import static io.restassured.RestAssured.given;
 
 public class ApiClient {
 
-    @Step("Creating courier with login {login} and password {password}")
-    public Response createCourier(String login, String password, String firstName) {
-        CourierRequest courier = new CourierRequest(login, password, firstName);
+    @Step("Creating courier")
+    public Response createCourier(CourierRequest courier) {
         return given()
                 .contentType(ContentType.JSON)
                 .body(courier)
                 .post(ApiConfig.BASE_URL + ApiConfig.COURIER_ENDPOINT);
     }
 
-    @Step("Login courier with login {login}")
-    public Response loginCourier(String login, String password) {
-        CourierLoginRequest loginRequest = new CourierLoginRequest(login, password);
+    @Step("Login courier with login {loginRequest.login}")
+    public Response loginCourier(CourierLoginRequest loginRequest) {
         return given()
                 .contentType(ContentType.JSON)
                 .body(loginRequest)

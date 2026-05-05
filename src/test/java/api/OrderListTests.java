@@ -5,6 +5,7 @@ import io.restassured.response.Response;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.apache.http.HttpStatus.SC_OK;
 import static org.hamcrest.Matchers.*;
 
 @Epic("REST API Tests")
@@ -26,7 +27,7 @@ public class OrderListTests {
         Response response = apiClient.getOrdersList();
 
         response.then()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue())
                 .body("orders", isA(java.util.List.class));
     }
@@ -39,7 +40,7 @@ public class OrderListTests {
         Response response = apiClient.getOrdersList();
 
         response.then()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders", notNullValue());
     }
 
@@ -51,7 +52,7 @@ public class OrderListTests {
         Response response = apiClient.getOrdersList();
 
         response.then()
-                .statusCode(200)
+                .statusCode(SC_OK)
                 .body("orders[0].track", notNullValue());
     }
 }
